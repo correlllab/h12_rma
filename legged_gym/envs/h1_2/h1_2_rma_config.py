@@ -5,71 +5,93 @@ class H1_2RMACfg(LeggedRobotCfg):
     """H1-2 RMA config: RMA-enabled environment with torso + hand force sampling."""
 
     class init_state(LeggedRobotCfg.init_state):
-        pos = [0.0, 0.0, 1.05]  # x,y,z [m]
+        pos = [0.0, 0.0, 1.0]  # x,y,z [m]
         default_joint_angles = { # = target angles [rad] when action = 0.0
-            'left_hip_yaw_joint': 0,
-            'left_hip_roll_joint': 0,
+            # -------- Legs (12) -------
+            'left_hip_yaw_joint': 0.0,
             'left_hip_pitch_joint': -0.16,
+            'left_hip_roll_joint': 0.0,
             'left_knee_joint': 0.36,
             'left_ankle_pitch_joint': -0.2,
             'left_ankle_roll_joint': 0.0,
 
-            'right_hip_yaw_joint': 0,
-            'right_hip_roll_joint': 0,
+            'right_hip_yaw_joint': 0.0,
             'right_hip_pitch_joint': -0.16,
+            'right_hip_roll_joint': 0.0,
             'right_knee_joint': 0.36,
             'right_ankle_pitch_joint': -0.2,
             'right_ankle_roll_joint': 0.0,
 
-            'torso_joint': 0,
+            # -------- Waist (1) --------
+            'torso_joint': 0.0,
 
-            'left_shoulder_pitch_joint': 0.4,
-            'left_shoulder_roll_joint': 0,
-            'left_shoulder_yaw_joint': 0,
-            'left_elbow_pitch_joint': 0.3,
+            # -------- Left Arm (7) --------
+            'left_shoulder_pitch_joint': 0.0,
+            'left_shoulder_roll_joint': 0.0,
+            'left_shoulder_yaw_joint': 0.0,
+            'left_elbow_pitch_joint': 0.0,
+            'left_elbow_roll_joint': 0.0,
+            'left_wrist_pitch_joint': 0.0,
+            'left_wrist_yaw_joint': 0.0,
 
-            'right_shoulder_pitch_joint': 0.4,
-            'right_shoulder_roll_joint': 0,
-            'right_shoulder_yaw_joint': 0,
-            'right_elbow_pitch_joint': 0.3,
+            # -------- Right Arm (7) --------
+            'right_shoulder_pitch_joint': 0.0,
+            'right_shoulder_roll_joint': 0.0,
+            'right_shoulder_yaw_joint': 0.0,
+            'right_elbow_pitch_joint': 0.0,
+            'right_elbow_roll_joint': 0.0,
+            'right_wrist_pitch_joint': 0.0,
+            'right_wrist_yaw_joint': 0.0,
         }
 
     class env(LeggedRobotCfg.env):
-        # Observation: 3 (ang_vel) + 3 (gravity) + 3 (cmd) + 12 (dof_pos) + 12 (dof_vel) + 12 (action) + 2 (phase)
-        # = 47 dimensions (same as non-RMA)
-        num_observations = 47
-        num_privileged_obs = 50
-        num_actions = 12
+        # Full-body with hands: 27 actuated DOFs (12 legs + 1 torso + 14 arms)
+        # Observation includes proprioception: 3 (ang_vel) + 3 (gravity) + 3 (cmd) + 27 (dof_pos) + 27 (dof_vel) + 27 (action) + 2 (phase) = 92
+        num_observations = 92
+        num_privileged_obs = 92
+        num_actions = 27
 
     class control(LeggedRobotCfg.control):
         # PD Drive parameters:
         control_type = 'P'
         stiffness = {
-            'hip_yaw_joint': 200.,
-            'hip_roll_joint': 200.,
-            'hip_pitch_joint': 200.,
-            'hip_pitch_joint': 200.,
-            'knee_joint': 300.,
-            'ankle_pitch_joint': 30.,
-            'ankle_roll_joint': 30.,
+            'hip_yaw': 200,
+            'hip_roll': 200,
+            'hip_pitch': 200,
+            'knee': 300,
+            'ankle_pitch': 60,
+            'ankle_roll': 40,
+            'torso': 600,
+            'shoulder_pitch': 80,
+            'shoulder_roll': 80,
+            'shoulder_yaw': 40,
+            'wrist': 60,
+            'elbow': 40,
         }
         damping = {
-            'hip_yaw_joint': 5.,
-            'hip_roll_joint': 5.,
-            'hip_pitch_joint': 5.,
-            'knee_joint': 8.,
-            'ankle_pitch_joint': 0.5,
-            'ankle_roll_joint': 0.5,
+            'hip_yaw': 5.,
+            'hip_roll': 5.,
+            'hip_pitch': 5.,
+            'knee': 7.5,
+            'ankle_pitch': 1.,
+            'ankle_roll': 0.3,
+            'torso': 15,
+            'shoulder_pitch': 2.,
+            'shoulder_roll': 2.,
+            'shoulder_yaw': 1.,
+            'wrist': 0.5,
+            'elbow': 1,
         }
         # action scale: target angle = actionScale * action + defaultAngle
         action_scale = 0.25
-        decimation = 10
+        decimation = 4
 
     class asset(LeggedRobotCfg.asset):
-        file = "{LEGGED_GYM_ROOT_DIR}/../h12_rma/resources/robots/h1_2/h1_2.urdf"
-        foot_name = "ankle"
-        penalize_contacts_on = ["foot"]
-        terminate_after_contacts_on = []
+        file = "{LEGGED_GYM_ROOT_DIR}/resources/robots/h1_2/h1_2_full.urdf"
+        name = "h1_2"
+        foot_name = "ankle_roll"
+        penalize_contacts_on = ["hip", "knee"]
+        terminate_after_contacts_on = ["torso"]
         self_collides = 1
 
     class rewards(LeggedRobotCfg.rewards):
@@ -79,25 +101,23 @@ class H1_2RMACfg(LeggedRobotCfg):
         max_contact_force = 300.
 
     class normalization(LeggedRobotCfg.normalization):
-        obs_scales = dict(
-            lin_vel=2.0,
-            ang_vel=0.25,
-            dof_pos=1.0,
-            dof_vel=0.05,
+        class obs_scales:
+            lin_vel = 2.0
+            ang_vel = 0.25
+            dof_pos = 1.0
+            dof_vel = 0.05
             height_measurements = 5.0
-        )
         action_scales = dict()
 
     class noise(LeggedRobotCfg.noise):
         add_noise = True
-        noise_scales = dict(
-            dof_pos=0.01,
-            dof_vel=1.5,
-            lin_vel=0.1,
-            ang_vel=0.2,
-            gravity=0.05,
-            height_measurements=0.1
-        )
+        class noise_scales:
+            dof_pos = 0.01
+            dof_vel = 1.5
+            lin_vel = 0.1
+            ang_vel = 0.2
+            gravity = 0.05
+            height_measurements = 0.1
         noise_freqs = dict(
             lin_vel=2.0,
             ang_vel=2.0,

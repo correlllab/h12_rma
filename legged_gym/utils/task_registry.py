@@ -1,16 +1,16 @@
 import os
 from datetime import datetime
-from typing import Tuple
+from typing import Tuple, Any
 import torch
 import numpy as np
 import sys
 
-from rsl_rl.env import VecEnv
-from rsl_rl.runners import OnPolicyRunner
-
 from legged_gym import LEGGED_GYM_ROOT_DIR, LEGGED_GYM_ENVS_DIR
 from .helpers import get_args, update_cfg_from_args, class_to_dict, get_load_path, set_seed, parse_sim_params
 from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobotCfgPPO
+
+# VecEnv is just a type annotation - environments are registered as any class
+VecEnv = Any
 
 class TaskRegistry():
     def __init__(self):
@@ -72,7 +72,7 @@ class TaskRegistry():
                             headless=args.headless)
         return env, env_cfg
 
-    def make_alg_runner(self, env, name=None, args=None, train_cfg=None, log_root="default") -> Tuple[OnPolicyRunner, LeggedRobotCfgPPO]:
+    def make_alg_runner(self, env, name=None, args=None, train_cfg=None, log_root="default"):
         """ Creates the training algorithm  either from a registered namme or from the provided config file.
 
         Args:
@@ -115,7 +115,28 @@ class TaskRegistry():
             log_dir = os.path.join(log_root, datetime.now().strftime('%b%d_%H-%M-%S') + '_' + train_cfg.runner.run_name)
         
         train_cfg_dict = class_to_dict(train_cfg)
-        runner = OnPolicyRunner(env, train_cfg_dict, log_dir, device=args.rl_device)
+        
+        # Use HIMOnPolicyRunner for RMA tasks, otherwise use default OnPolicyRunner
+        if hasattr(env, 'rma_torso') and hasattr(env, 'rma_left') and hasattr(env, 'rma_right'):
+            try:
+                from rsl_rl.runners import HIMOnPolicyRunner
+                print("✓ Using HIMOnPolicyRunner for RMA task")
+                runner = HIMOnPolicyRunner(env, train_cfg_dict, log_dir, device=args.rl_device)
+            except ImportError:
+                print("Warning: HIMOnPolicyRunner not available, using default OnPolicyRunner")
+                # Fallback to trying default runner
+                try:
+                    from rsl_rl.runners import OnPolicyRunner
+                    runner = OnPolicyRunner(env, train_cfg_dict, log_dir, device=args.rl_device)
+                except ImportError:
+                    raise RuntimeError("No suitable runner found for this task")
+        else:
+            try:
+                from rsl_rl.runners import OnPolicyRunner
+                runner = OnPolicyRunner(env, train_cfg_dict, log_dir, device=args.rl_device)
+            except ImportError:
+                raise RuntimeError("OnPolicyRunner not found in rsl_rl.runners")
+        
         #save resume path before creating a new log_dir
         resume = train_cfg.runner.resume
         if resume:

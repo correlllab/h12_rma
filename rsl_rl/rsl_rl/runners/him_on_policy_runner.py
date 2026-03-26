@@ -58,6 +58,10 @@ class HIMOnPolicyRunner:
         if self.use_rma:
             policy_cfg_dict['rma_latent_dim'] = self.rma_latent_dim
         
+        # Filter policy_cfg_dict to only include valid HIMActorCritic parameters
+        valid_keys = {'activation', 'actor_hidden_dims', 'critic_hidden_dims', 'rma_latent_dim'}
+        filtered_cfg_dict = {k: v for k, v in policy_cfg_dict.items() if k in valid_keys}
+        
         self.policy = HIMActorCritic(
             self.num_actor_obs,
             self.num_critic_obs,
@@ -66,7 +70,7 @@ class HIMOnPolicyRunner:
             self.env.actor_history_length,
             self.env.critic_history_length,
             self.env.num_lower_dof,
-            **policy_cfg_dict
+            **filtered_cfg_dict
         ).to(self.device)
         
         # Create encoder and decoder (optional)

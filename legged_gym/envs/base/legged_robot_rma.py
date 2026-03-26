@@ -84,9 +84,17 @@ class LeggedRobotRMA(LeggedRobot):
             self._rma_resample_prob,
         ) = _import_rma()
 
-        self._rma_torso_body_index = self.body_names.index("torso_link")
-        self._rma_left_wrist_body_index = self.body_names.index("left_wrist_roll_link")
-        self._rma_right_wrist_body_index = self.body_names.index("right_wrist_roll_link")
+        # Find body indices for RMA force application
+        self._rma_torso_body_index = self.gym.find_actor_rigid_body_handle(self.envs[0], self.actor_handles[0], "torso_link")
+        self._rma_left_wrist_body_index = self.gym.find_actor_rigid_body_handle(self.envs[0], self.actor_handles[0], "left_wrist_roll_link")
+        self._rma_right_wrist_body_index = self.gym.find_actor_rigid_body_handle(self.envs[0], self.actor_handles[0], "right_wrist_roll_link")
+
+        # RMA-required observation attributes for HIMOnPolicyRunner
+        self.num_one_step_obs = self.cfg.env.num_observations
+        self.num_one_step_privileged_obs = self.cfg.env.num_privileged_obs
+        self.actor_history_length = 3
+        self.critic_history_length = 3
+        self.num_lower_dof = 6  # number of leg DOFs (3 per leg)
 
         # (num_envs, 3) each — 3D force in world frame
         self.rma_torso = torch.zeros(self.num_envs, 3, device=self.device, dtype=torch.float32)

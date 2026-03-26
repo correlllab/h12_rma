@@ -42,8 +42,16 @@ class EnvFactorEncoderCfg:
 class EnvFactorEncoder(nn.Module):
     """Encodes observation history to latent representation of extrinsic factors."""
     
-    def __init__(self, cfg: EnvFactorEncoderCfg):
+    def __init__(self, cfg: EnvFactorEncoderCfg = None, **kwargs):
         super().__init__()
+        
+        # Support both config object and keyword arguments
+        if cfg is None:
+            cfg = EnvFactorEncoderCfg(**kwargs)
+        elif kwargs:
+            # If both cfg and kwargs provided, kwargs override cfg values
+            for key, value in kwargs.items():
+                setattr(cfg, key, value)
         
         self.temporal_steps = cfg.temporal_steps
         self.num_one_step_obs = cfg.num_one_step_obs

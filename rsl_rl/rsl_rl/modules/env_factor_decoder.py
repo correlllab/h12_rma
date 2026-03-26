@@ -41,8 +41,16 @@ class EnvFactorDecoderCfg:
 class EnvFactorDecoder(nn.Module):
     """Decodes latent representation back to extrinsic factors e_t."""
     
-    def __init__(self, cfg: EnvFactorDecoderCfg):
+    def __init__(self, cfg: EnvFactorDecoderCfg = None, **kwargs):
         super().__init__()
+        
+        # Support both config object and keyword arguments
+        if cfg is None:
+            cfg = EnvFactorDecoderCfg(**kwargs)
+        elif kwargs:
+            # If both cfg and kwargs provided, kwargs override cfg values
+            for key, value in kwargs.items():
+                setattr(cfg, key, value)
         
         self.latent_dim = cfg.latent_dim
         self.et_dim = cfg.et_dim

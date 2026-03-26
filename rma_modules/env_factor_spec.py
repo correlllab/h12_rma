@@ -30,7 +30,7 @@ RMA_RESAMPLE_PROB: float = 0.004
 @dataclass(frozen=True)
 class RmaEtSpec:
     """e_t for H12 RMA (torso + hands, 3D spherical): 
-    15 upper-body + torso_xyz(3) + left_hand_xyz(3) + right_hand_xyz(3) = 24.
+    15 upper-body (1 torso + 7 per arm) + torso_xyz(3) + left_hand_xyz(3) + right_hand_xyz(3) = 24.
     """
 
     upper_body_dof_dim: int = 15
@@ -76,15 +76,15 @@ UPPER_BODY_JOINT_NAMES: tuple[str, ...] = (
     "left_shoulder_pitch_joint",
     "left_shoulder_roll_joint",
     "left_shoulder_yaw_joint",
-    "left_elbow_joint",
-    "left_wrist_roll_joint",
+    "left_elbow_pitch_joint",
+    "left_elbow_roll_joint",
     "left_wrist_pitch_joint",
     "left_wrist_yaw_joint",
     "right_shoulder_pitch_joint",
     "right_shoulder_roll_joint",
     "right_shoulder_yaw_joint",
-    "right_elbow_joint",
-    "right_wrist_roll_joint",
+    "right_elbow_pitch_joint",
+    "right_elbow_roll_joint",
     "right_wrist_pitch_joint",
     "right_wrist_yaw_joint",
 )
