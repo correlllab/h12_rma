@@ -61,8 +61,9 @@ class HIMPPO:
         if env_factors_shape is not None:
             self.env_factors = []
     
-    def update(self, obs, critic_obs, actions, rewards, dones, values, 
+    def update(self, obs, critic_obs, actions, rewards, dones, values,
                next_obs, next_critic_obs, next_value,
+               old_log_probs=None,
                env_factors=None, env_factors_next=None,
                num_learning_epochs=5, num_mini_batches=4):
         """
@@ -97,6 +98,7 @@ class HIMPPO:
         flat_actions = actions.view(-1, actions.size(-1))
         flat_advantages = advantages.view(-1)
         flat_returns = returns.view(-1)
+        flat_old_log_probs = old_log_probs.view(-1) if old_log_probs is not None else None
         
         # Training loop
         total_policy_loss = 0.0
@@ -113,20 +115,24 @@ class HIMPPO:
             
             for i in range(0, batch_size, batch_size // num_mini_batches):
                 batch_indices = indices[i:i + batch_size // num_mini_batches]
-                
+
                 batch_obs = flat_obs[batch_indices]
                 batch_critic_obs = flat_critic_obs[batch_indices]
                 batch_actions = flat_actions[batch_indices]
                 batch_advantages = flat_advantages[batch_indices]
                 batch_returns = flat_returns[batch_indices]
-                
+
                 # Policy and value updates
                 log_prob, entropy, value = self.actor_critic.evaluate(
                     batch_obs, batch_critic_obs, batch_actions
                 )
-                
-                # Policy loss (PPO)
-                ratio = torch.exp(log_prob - log_prob.detach())
+
+                # Policy loss (PPO) — ratio uses stored old log probs from rollout
+                if flat_old_log_probs is not None:
+                    batch_old_log_probs = flat_old_log_probs[batch_indices]
+                    ratio = torch.exp(log_prob - batch_old_log_probs)
+                else:
+                    ratio = torch.ones_like(log_prob)
                 clip_ratio = torch.clamp(ratio, 0.8, 1.2)
                 policy_loss = -torch.min(
                     ratio * batch_advantages,

@@ -70,8 +70,8 @@ class LeggedRobotRMA(LeggedRobot):
     - At reset: sample torso and hand forces for reset envs.
     - Each step: with probability RMA_RESAMPLE_PROB per env, resample; then apply
       rma_torso (num_envs, 3), rma_left (num_envs, 3), and rma_right (num_envs, 3) 
-      to torso_link, left_wrist_roll_link, and right_wrist_roll_link.
-    - Requires: torso_link, left_wrist_roll_link, right_wrist_roll_link.
+      to torso_link, left_wrist_yaw_link, and right_wrist_yaw_link.
+    - Requires: torso_link, left_wrist_yaw_link, right_wrist_yaw_link.
     """
 
     def __init__(self, cfg: LeggedRobotCfg, sim_params, physics_engine, sim_device, headless):
@@ -86,8 +86,8 @@ class LeggedRobotRMA(LeggedRobot):
 
         # Find body indices for RMA force application
         self._rma_torso_body_index = self.gym.find_actor_rigid_body_handle(self.envs[0], self.actor_handles[0], "torso_link")
-        self._rma_left_wrist_body_index = self.gym.find_actor_rigid_body_handle(self.envs[0], self.actor_handles[0], "left_wrist_roll_link")
-        self._rma_right_wrist_body_index = self.gym.find_actor_rigid_body_handle(self.envs[0], self.actor_handles[0], "right_wrist_roll_link")
+        self._rma_left_wrist_body_index = self.gym.find_actor_rigid_body_handle(self.envs[0], self.actor_handles[0], "left_wrist_yaw_link")
+        self._rma_right_wrist_body_index = self.gym.find_actor_rigid_body_handle(self.envs[0], self.actor_handles[0], "right_wrist_yaw_link")
 
         # RMA-required observation attributes for HIMOnPolicyRunner
         self.num_one_step_obs = self.cfg.env.num_observations

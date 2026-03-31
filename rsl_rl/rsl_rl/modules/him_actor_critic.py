@@ -109,6 +109,14 @@ class HIMActorCritic(nn.Module):
         dist = Normal(mean, std)
         action = dist.sample()
         return action.detach()
+
+    def act_and_log_prob(self, actor_obs, critic_obs):
+        """Sample action and return (action, log_prob, value) — all detached."""
+        mean, std, value = self.forward(actor_obs, critic_obs)
+        dist = Normal(mean, std)
+        action = dist.sample()
+        log_prob = dist.log_prob(action).sum(dim=-1)
+        return action.detach(), log_prob.detach(), value.squeeze(-1).detach()
     
     def get_actions_log_prob(self, actor_obs, critic_obs, actions):
         """Get log probability of actions."""

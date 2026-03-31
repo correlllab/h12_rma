@@ -5,7 +5,7 @@ Torso + Hand RMA: 3D torso forces (uniform per axis) + 3D hand forces (spherical
 - Torso: Fx, Fy, Fz each U(±30).
 - Hands: Magnitude U(0, 30), direction = normalize(randn(3)).
 - Resample with probability 0.004 per step.
-- Requires: torso_link, left_wrist_roll_link, right_wrist_roll_link.
+- Requires: torso_link, left_wrist_yaw_link, right_wrist_yaw_link.
 """
 
 from __future__ import annotations

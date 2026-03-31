@@ -69,7 +69,7 @@ class HIMOnPolicyRunner:
             num_one_step_critic_obs,
             self.env.actor_history_length,
             self.env.critic_history_length,
-            self.env.num_lower_dof,
+            self.env.num_actions,
             **filtered_cfg_dict
         ).to(self.device)
         
@@ -172,7 +172,6 @@ class HIMOnPolicyRunner:
         
         self.policy.train()
         
-        ep_infos = []
         rewbuffer = deque(maxlen=100)
         lenbuffer = deque(maxlen=100)
         cur_reward_sum = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
@@ -181,14 +180,26 @@ class HIMOnPolicyRunner:
         start_iter = self.current_learning_iteration
         tot_iter = start_iter + num_learning_iterations
         
+        num_steps = self.cfg.get("num_steps_per_env", 10)
+        save_interval = self.cfg.get("save_interval", 50)
+
         for it in range(start_iter, tot_iter):
             start = time.time()
-            
+
+            # Rollout storage
+            obs_list = []
+            critic_obs_list = []
+            actions_list = []
+            log_probs_list = []
+            values_list = []
+            rewards_list = []
+            dones_list = []
+
             # Collect rollouts
             with torch.inference_mode():
-                for step in range(self.cfg.get("num_steps_per_env", 10)):
-                    
-                    # Update encoder/decoder (if RMA)
+                for step in range(num_steps):
+
+                    # Update RMA latent (if enabled)
                     if self.use_rma and self._build_et_from_gym is not None and self.encoder is not None:
                         e_t = self._build_et_from_gym(
                             self.env.dof_pos,
@@ -199,79 +210,124 @@ class HIMOnPolicyRunner:
                         ).to(self.device)
                         z_t = self.encoder(e_t)
                         critic_obs = torch.cat([privileged_obs.to(self.device), z_t], dim=-1)
-                        
-                        # Update z_history: newest at index 0 (chronological for actor)
+
+                        # Update z_history: newest at index 0
                         self._z_history[:, 1:, :] = self._z_history[:, :-1, :].clone()
                         self._z_history[:, 0, :] = z_t
-                    
-                    # Get actions from policy
+
+                    # Build actor input
                     if self.use_rma and self._z_history is not None:
-                        # Concatenate z_history with obs for actor
                         z_history_flat = self._z_history.view(self.env.num_envs, -1)
                         actor_obs_input = torch.cat([obs, z_history_flat], dim=-1)
                     else:
                         actor_obs_input = obs
-                    
-                    actions = self.policy.act(actor_obs_input, critic_obs)
-                    
+
+                    # Sample actions, log probs, and value estimate in one forward pass
+                    actions, log_probs, values = self.policy.act_and_log_prob(actor_obs_input, critic_obs)
+
+                    # Store rollout step
+                    obs_list.append(actor_obs_input.clone())
+                    critic_obs_list.append(critic_obs.clone())
+                    actions_list.append(actions.clone())
+                    log_probs_list.append(log_probs.clone())
+                    values_list.append(values.clone())
+
                     # Step environment
                     obs, _, rews, dones, infos = self.env.step(actions)
                     obs = obs.to(self.device)
-                    
-                    # Update buffers
+
+                    rewards_list.append(rews.to(self.device).clone())
+                    dones_list.append(dones.to(self.device).float().clone())
+
+                    # Episode stats
                     cur_reward_sum += rews
                     cur_episode_length += 1
-                    
-                    # Log episode info on reset
+
                     done_ids = dones.nonzero(as_tuple=False)
                     if len(done_ids) > 0:
                         for i in done_ids:
-                            ep_infos.append({
-                                'reward': cur_reward_sum[i].item(),
-                                'length': cur_episode_length[i].item(),
-                            })
                             rewbuffer.append(cur_reward_sum[i].item())
                             lenbuffer.append(cur_episode_length[i].item())
-                        
                         cur_reward_sum[done_ids] = 0
                         cur_episode_length[done_ids] = 0
-            
-            # Get privileged obs for critic
+
+                # Next-step value for GAE bootstrap
+                if self.use_rma and self._build_et_from_gym is not None and self.encoder is not None:
+                    privileged_obs = self.env.get_privileged_observations()
+                    e_t_next = self._build_et_from_gym(
+                        self.env.dof_pos,
+                        self.env.rma_torso,
+                        self.env.rma_left,
+                        self.env.rma_right,
+                        self.env.dof_names,
+                    ).to(self.device)
+                    z_next = self.encoder(e_t_next)
+                    critic_obs_next = torch.cat([privileged_obs.to(self.device), z_next], dim=-1)
+                else:
+                    if self.env.num_privileged_obs is not None:
+                        privileged_obs = self.env.get_privileged_observations()
+                        critic_obs_next = privileged_obs.to(self.device)
+                    else:
+                        critic_obs_next = obs
+                _, _, next_value = self.policy.act_and_log_prob(obs, critic_obs_next)
+
+            # Stack rollout tensors: (T, num_envs, dim)
+            obs_t = torch.stack(obs_list)
+            critic_obs_t = torch.stack(critic_obs_list)
+            actions_t = torch.stack(actions_list)
+            log_probs_t = torch.stack(log_probs_list)
+            values_t = torch.stack(values_list)
+            rewards_t = torch.stack(rewards_list)
+            dones_t = torch.stack(dones_list)
+
+            # Update policy
+            losses = self.alg.update(
+                obs_t, critic_obs_t, actions_t, rewards_t, dones_t, values_t,
+                obs_t[-1], critic_obs_t[-1], next_value,
+                old_log_probs=log_probs_t,
+                num_learning_epochs=self.alg_cfg.get('num_learning_epochs', 5),
+                num_mini_batches=self.alg_cfg.get('num_mini_batches', 4),
+            )
+
+            # Get updated privileged obs for next iteration
             if self.env.num_privileged_obs is not None:
                 privileged_obs = self.env.get_privileged_observations()
                 critic_obs = privileged_obs.to(self.device)
             else:
-                critic_obs = obs.to(self.device)
-            
-            # Log statistics
+                critic_obs = obs
+
+            # Logging
             if self.log_dir is not None and self.writer is not None:
                 if len(rewbuffer) > 0:
                     self.writer.add_scalar('Episode/Reward_Mean', statistics.mean(rewbuffer), it)
                     self.writer.add_scalar('Episode/Length_Mean', statistics.mean(lenbuffer), it)
-                
-                # Log RMA forces (if enabled)
+
+                for loss_name, loss_val in losses.items():
+                    self.writer.add_scalar(f'Loss/{loss_name}', loss_val, it)
+
                 if self.use_rma:
                     self.writer.add_scalar(
                         'RMA/torso_force_l2_mean',
-                        torch.norm(self.env.rma_torso, dim=1).mean().item(),
-                        it
-                    )
+                        torch.norm(self.env.rma_torso, dim=1).mean().item(), it)
                     self.writer.add_scalar(
                         'RMA/left_hand_force_l2_mean',
-                        torch.norm(self.env.rma_left, dim=1).mean().item(),
-                        it
-                    )
+                        torch.norm(self.env.rma_left, dim=1).mean().item(), it)
                     self.writer.add_scalar(
                         'RMA/right_hand_force_l2_mean',
-                        torch.norm(self.env.rma_right, dim=1).mean().item(),
-                        it
-                    )
-            
-            # Time
+                        torch.norm(self.env.rma_right, dim=1).mean().item(), it)
+
+            # Save checkpoint
+            if self.log_dir is not None and (it + 1) % save_interval == 0:
+                self.save(os.path.join(self.log_dir, f'model_{it + 1}.pt'))
+
             iteration_time = time.time() - start
             self.tot_time += iteration_time
-            self.tot_timesteps += self.env.num_envs * self.cfg.get("num_steps_per_env", 10)
+            self.tot_timesteps += self.env.num_envs * num_steps
             self.current_learning_iteration += 1
+
+            if it % 10 == 0:
+                fps = self.env.num_envs * num_steps / iteration_time
+                print(f"Iter {it}/{tot_iter}  reward={statistics.mean(rewbuffer) if rewbuffer else 0:.2f}  fps={fps:.0f}")
     
     def save(self, path):
         """Save policy checkpoint."""

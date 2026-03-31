@@ -46,9 +46,10 @@ class H1_2RMACfg(LeggedRobotCfg):
 
     class env(LeggedRobotCfg.env):
         # Full-body with hands: 27 actuated DOFs (12 legs + 1 torso + 14 arms)
-        # Observation includes proprioception: 3 (ang_vel) + 3 (gravity) + 3 (cmd) + 27 (dof_pos) + 27 (dof_vel) + 27 (action) + 2 (phase) = 92
+        # obs:            3 (ang_vel) + 3 (gravity) + 3 (cmd) + 27 (dof_pos) + 27 (dof_vel) + 27 (action) + 2 (phase) = 92
+        # privileged_obs: 3 (lin_vel) + 3 (ang_vel) + 3 (gravity) + 3 (cmd) + 27 (dof_pos) + 27 (dof_vel) + 27 (action) + 2 (phase) = 95
         num_observations = 92
-        num_privileged_obs = 92
+        num_privileged_obs = 95
         num_actions = 27
 
     class control(LeggedRobotCfg.control):

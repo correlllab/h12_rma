@@ -1,12 +1,12 @@
 """Environment factor (e_t) specification for H12 RMA with Isaac Gym (torso + hands, spherical).
 
 e_t = 15 upper-body joint positions (read from dof_pos) + 3 torso forces + 6 hand force components (sampled).
-Torso forces sampled uniformly in ±30N per axis. Hand forces sampled in 3D via spherical sampling 
+Torso forces sampled uniformly in ±30N per axis. Hand forces sampled in 3D via spherical sampling
 (magnitude then direction) and applied to each wrist link in world frame.
 
 - Torso: Fx, Fy, Fz each U(±30) N
-- Hands: magnitude U(0, max), direction uniform on unit sphere. Stored in e_t as (Fx, Fy, Fz) per hand; 
-  applied as-is to left_wrist_roll_link and right_wrist_roll_link.
+- Hands: magnitude U(0, max), direction uniform on unit sphere. Stored in e_t as (Fx, Fy, Fz) per hand;
+  applied as-is to left_wrist_yaw_link and right_wrist_yaw_link.
 """
 
 from __future__ import annotations
@@ -91,6 +91,6 @@ UPPER_BODY_JOINT_NAMES: tuple[str, ...] = (
 
 RMA_FORCE_BODY_NAMES: tuple[str, ...] = (
     "torso_link",
-    "left_wrist_roll_link",
-    "right_wrist_roll_link",
+    "left_wrist_yaw_link",
+    "right_wrist_yaw_link",
 )
