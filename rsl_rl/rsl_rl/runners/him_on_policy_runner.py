@@ -79,12 +79,14 @@ class HIMOnPolicyRunner:
         self._build_et_from_gym = None
         if self.use_rma:
             from rma_modules import build_et_from_gym
+            from rma_modules.env_factor_spec import DEFAULT_ET_SPEC
+
             self._build_et_from_gym = build_et_from_gym
-            
-            # Encoder: obs_history → latent z
+
+            # Encoder maps e_t (24-dim extrinsic vector), not privileged obs. learn() passes e_t each step.
             self.encoder = EnvFactorEncoder(
-                temporal_steps=3,
-                num_one_step_obs=num_one_step_critic_obs,
+                temporal_steps=1,
+                num_one_step_obs=DEFAULT_ET_SPEC.dim,
                 latent_dim=self.rma_latent_dim,
             ).to(self.device)
             
