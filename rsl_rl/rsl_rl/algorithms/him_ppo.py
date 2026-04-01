@@ -36,10 +36,12 @@ class HIMPPO:
         self.value_coef = value_coef
         self.max_grad_norm = max_grad_norm
         
-        self.optimizer = torch.optim.Adam(
-            self.actor_critic.parameters(),
-            lr=self.learning_rate
-        )
+        all_params = list(self.actor_critic.parameters())
+        if self.encoder is not None:
+            all_params += list(self.encoder.parameters())
+        if self.decoder is not None:
+            all_params += list(self.decoder.parameters())
+        self.optimizer = torch.optim.Adam(all_params, lr=self.learning_rate)
     
     def init_storage(self, num_envs, num_steps, num_obs, num_critic_obs, num_actions, 
                      env_factors_shape=None):
@@ -148,18 +150,15 @@ class HIMPPO:
                 # Total loss
                 loss = policy_loss + self.value_coef * value_loss + entropy_loss
                 
-                # Optional encoder loss
-                encoder_loss = 0.0
-                if self.encoder is not None and env_factors is not None:
-                    # Extract velocity from next state (assuming it's in privileged obs)
-                    # This is a simple version; adapt based on your obs structure
-                    encoder_loss = 0.0  # Placeholder
-                
-                # Optional decoder loss
-                decoder_loss = 0.0
-                if self.decoder is not None and env_factors is not None:
-                    # Decode latent z back to e_t
-                    decoder_loss = 0.0  # Placeholder
+                # Encoder + decoder reconstruction loss (e_t → z → e_t_hat)
+                encoder_loss = torch.tensor(0.0, device=self.device)
+                decoder_loss = torch.tensor(0.0, device=self.device)
+                if self.encoder is not None and self.decoder is not None and env_factors is not None:
+                    flat_et = env_factors.view(-1, env_factors.size(-1))
+                    batch_et = flat_et[batch_indices]
+                    z_recon = self.encoder(batch_et)
+                    et_hat = self.decoder(z_recon)
+                    decoder_loss = F.mse_loss(et_hat, batch_et.detach())
                 
                 total_loss = loss + encoder_loss + decoder_loss
                 

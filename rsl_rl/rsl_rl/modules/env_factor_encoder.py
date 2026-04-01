@@ -93,7 +93,7 @@ class EnvFactorEncoder(nn.Module):
         parts = self.encoder(obs_history.detach())
         vel, z = parts[..., :3], parts[..., 3:]
         z = F.normalize(z, dim=-1, p=2.0)
-        return z.detach()
+        return z
     
     def encode(self, obs_history):
         """

@@ -194,6 +194,7 @@ class HIMOnPolicyRunner:
             values_list = []
             rewards_list = []
             dones_list = []
+            et_list = []
 
             # Collect rollouts
             with torch.inference_mode():
@@ -210,6 +211,7 @@ class HIMOnPolicyRunner:
                         ).to(self.device)
                         z_t = self.encoder(e_t)
                         critic_obs = torch.cat([privileged_obs.to(self.device), z_t], dim=-1)
+                        et_list.append(e_t.clone())
 
                         # Update z_history: newest at index 0
                         self._z_history[:, 1:, :] = self._z_history[:, :-1, :].clone()
@@ -279,12 +281,14 @@ class HIMOnPolicyRunner:
             values_t = torch.stack(values_list)
             rewards_t = torch.stack(rewards_list)
             dones_t = torch.stack(dones_list)
+            et_t = torch.stack(et_list) if et_list else None
 
             # Update policy
             losses = self.alg.update(
                 obs_t, critic_obs_t, actions_t, rewards_t, dones_t, values_t,
                 obs_t[-1], critic_obs_t[-1], next_value,
                 old_log_probs=log_probs_t,
+                env_factors=et_t,
                 num_learning_epochs=self.alg_cfg.get('num_learning_epochs', 5),
                 num_mini_batches=self.alg_cfg.get('num_mini_batches', 4),
             )
