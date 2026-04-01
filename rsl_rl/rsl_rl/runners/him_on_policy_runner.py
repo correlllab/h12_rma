@@ -271,7 +271,12 @@ class HIMOnPolicyRunner:
                         critic_obs_next = privileged_obs.to(self.device)
                     else:
                         critic_obs_next = obs
-                _, _, next_value = self.policy.act_and_log_prob(obs, critic_obs_next)
+                if self.use_rma and self._z_history is not None:
+                    z_history_flat_next = self._z_history.view(self.env.num_envs, -1)
+                    actor_obs_next = torch.cat([obs, z_history_flat_next], dim=-1)
+                else:
+                    actor_obs_next = obs
+                _, _, next_value = self.policy.act_and_log_prob(actor_obs_next, critic_obs_next)
 
             # Stack rollout tensors: (T, num_envs, dim)
             obs_t = torch.stack(obs_list)

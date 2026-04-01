@@ -59,24 +59,22 @@ class HIMActorCritic(nn.Module):
         self.num_actions = num_actions
         self.rma_latent_dim = rma_latent_dim
         
-        activation_fn = get_activation(activation)
-        
         # Actor network
         actor_layers = []
         actor_input_dim = num_actor_obs
         for hidden_dim in actor_hidden_dims:
-            actor_layers += [nn.Linear(actor_input_dim, hidden_dim), activation_fn]
+            actor_layers += [nn.Linear(actor_input_dim, hidden_dim), get_activation(activation)]
             actor_input_dim = hidden_dim
         actor_layers += [nn.Linear(actor_input_dim, num_actions)]
         self.actor_trunk = nn.Sequential(*actor_layers)
         self.actor_mean = nn.Identity()  # mean is output of trunk
         self.actor_std = nn.Parameter(torch.zeros(num_actions))
-        
+
         # Critic network
         critic_layers = []
         critic_input_dim = num_critic_obs
         for hidden_dim in critic_hidden_dims:
-            critic_layers += [nn.Linear(critic_input_dim, hidden_dim), activation_fn]
+            critic_layers += [nn.Linear(critic_input_dim, hidden_dim), get_activation(activation)]
             critic_input_dim = hidden_dim
         critic_layers += [nn.Linear(critic_input_dim, 1)]
         self.critic_trunk = nn.Sequential(*critic_layers)

@@ -93,7 +93,7 @@ class H1_2RMACfg(LeggedRobotCfg):
         foot_name = "ankle_roll"
         penalize_contacts_on = ["hip", "knee"]
         terminate_after_contacts_on = ["torso"]
-        self_collides = 1
+        self_collisions = 1  # 1 to disable, 0 to enable (bitwise filter)
 
     class rewards(LeggedRobotCfg.rewards):
         soft_dof_pos_limit = 0.9

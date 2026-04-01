@@ -23,4 +23,4 @@ fi
 ISAAC_GYM_PY="${ISAAC_GYM_PY:-$(cd "$SCRIPT_DIR/.." && pwd)/isaacgym/python}"
 export PYTHONPATH="${ISAAC_GYM_PY}:${SCRIPT_DIR}:${SCRIPT_DIR}/rsl_rl"
 
-exec python legged_gym/scripts/train.py --task=h1_2_rma "$@"
+exec python legged_gym/scripts/train.py --task=h1_2_rma --headless"$@"
